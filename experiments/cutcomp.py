@@ -232,23 +232,23 @@ def compute_area_flow():
 
     def map_lut_at(ni):
         n = GRAPH[ni]
-        print(n.best_cut)
+        # print(n.best_cut)
         assert len(n.best_cut) <= LUTN
         inps = []
         for inp in n.best_cut:
             inpn = GRAPH[inp]
-            print(inpn.name)
+            # print(inpn.name)
             inpn.num_fanouts += 1
             if inpn.is_pi():
                 inps.append(inp)
             else:
-                print("recurse!")
+                # print("recurse!")
                 lutidx = map_lut_at(inp)
-                print(f"got lut {lutidx}")
+                # print(f"got lut {lutidx}")
                 inps.append(-lutidx - 1)
-        print(inps)
+        # print(inps)
         lutidx = len(lutlutlut)
-        lutlutlut.append(inps)
+        lutlutlut.append((inps, ni))
         return lutidx
 
     for po in POs:
@@ -261,11 +261,11 @@ def compute_area_flow():
         if n.is_pi():
             n.af = 0.0
         else:
-            print(f"node {n.name} #fanouts {n.num_fanouts} bestcut {n.best_cut}")
+            # print(f"node {n.name} #fanouts {n.num_fanouts} bestcut {n.best_cut}")
 
             af = 0.0
             for inp in n.best_cut:
-                print(f" input {GRAPH[inp].name} contributed {GRAPH[inp].af}")
+                # print(f" input {GRAPH[inp].name} contributed {GRAPH[inp].af}")
                 af += GRAPH[inp].af
             af += 1
 
@@ -293,3 +293,43 @@ def print_area_flow(n):
 lut_mapping = compute_area_flow()
 printgraph('cuts_af', print_area_flow)
 print(lut_mapping)
+
+def compute_required_times():
+    time_max = -1
+    for po in POs:
+        time_max = max(time_max, GRAPH[po].node_arrival)
+    assert time_max >= 0
+    print(time_max)
+
+    for ni in TOPO_ORDER:
+        GRAPH[ni].required_time = 9999
+    for po in POs:
+        GRAPH[po].required_time = time_max
+
+    def required_time_at(ni):
+        n = GRAPH[ni]
+        time_req_new = n.required_time - 1
+        if not n.is_pi():
+            for inp in n.best_cut:
+                inpn = GRAPH[inp]
+                time_req_old = inpn.required_time
+                inpn.required_time = min(time_req_old, time_req_new)
+                required_time_at(inp)
+
+    for po in POs:
+        required_time_at(po)
+
+def print_required_times(n):
+    ret = n.name
+    ret += "\nrequired time = " + str(n.required_time)
+    if n.best_cut is not None:
+        ret += "\nbest cut = {"
+        for ni in n.best_cut:
+            ret += GRAPH[ni].name + ","
+        if ret.endswith(","):
+            ret = ret[:-1]
+        ret += "}"
+    return ret
+
+compute_required_times()
+printgraph('cuts_times', print_required_times)
