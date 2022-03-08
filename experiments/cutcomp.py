@@ -206,9 +206,9 @@ def compute_arrivals():
 
 def print_cuts_arrivals(n):
     ret = print_cuts(n)
-    ret += "\nbest area (flow) = " + str(n.af)
+    ret += "\nbest area = " + str(n.af)
     ret += "\nbest arrival = " + str(n.node_arrival)
-    ret += "\nall area (flow) = " + str(n.cut_afs)
+    ret += "\nall areas = " + str(n.cut_afs)
     ret += "\nall arrivals = " + str(n.cut_arrivals)
     if n.best_cut is not None:
         ret += "\nbest cut = {"
@@ -259,35 +259,31 @@ def compute_area_flow():
         n = GRAPH[ni]
 
         if n.is_pi():
-            n.af = 0.0
+            n.cut_afs = [9999]
         else:
-            # print(f"node {n.name} #fanouts {n.num_fanouts} bestcut {n.best_cut}")
+            cut_afs = [9999]
+            assert n.cuts[0] == {ni}
+            assert len(n.cuts) > 1
+            # skip trivial cut
+            for cut in n.cuts[1:]:
+                af = 0.0
+                for inp in cut:
+                    af += GRAPH[inp].af
+                af += 1
 
-            af = 0.0
-            for inp in n.best_cut:
-                # print(f" input {GRAPH[inp].name} contributed {GRAPH[inp].af}")
-                af += GRAPH[inp].af
-            af += 1
+                if n.num_fanouts != 0:
+                    af /= n.num_fanouts
 
-            if n.num_fanouts != 0:
-                af /= n.num_fanouts
-
-            n.af = af
+                cut_afs.append(af)
+            n.cut_afs = cut_afs
 
 
     return lutlutlut
 
 def print_area_flow(n):
-    ret = n.name
+    ret = print_cuts(n)
     ret += "\n# fanouts = " + str(n.num_fanouts)
-    ret += "\narea flow = " + str(n.af)
-    if n.best_cut is not None:
-        ret += "\nbest cut = {"
-        for ni in n.best_cut:
-            ret += GRAPH[ni].name + ","
-        if ret.endswith(","):
-            ret = ret[:-1]
-        ret += "}"
+    ret += "\narea flows = " + str(n.cut_afs)
     return ret
 
 lut_mapping = compute_area_flow()
@@ -333,3 +329,6 @@ def print_required_times(n):
 
 compute_required_times()
 printgraph('cuts_times', print_required_times)
+
+def recover_area_global():
+    ...
