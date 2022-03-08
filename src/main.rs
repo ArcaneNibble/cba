@@ -82,8 +82,25 @@ impl Display for AIGRef {
 
 const LUT_SZ: usize = 4;
 
+#[derive(Clone, Debug)]
+pub struct AIGCut {
+    pub refs: HashSet<AIGRef>,
+    pub arrival: u32,
+}
+
+impl AIGCut {
+    fn trivial(nref: AIGRef) -> Self {
+        let mut hs = HashSet::new();
+        hs.insert(nref);
+        Self {
+            refs: hs,
+            arrival: u32::MAX,
+        }
+    }
+}
+
 /// AND node in an AIG
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, Debug)]
 pub struct AIGNode {
     pub name: String,
     pub inp0: AIGRef,
@@ -93,7 +110,8 @@ pub struct AIGNode {
     /// will be abused for initial topological order computation as a mark flag
     pub num_fanouts: u32,
 
-    pub cuts: Vec<HashSet<AIGRef>>,
+    pub cuts: Vec<AIGCut>,
+    pub arrival: u32,
 }
 
 impl AIGNode {
@@ -105,6 +123,7 @@ impl AIGNode {
 
             num_fanouts: 0,
             cuts: Vec::new(),
+            arrival: u32::MAX,
         }
     }
 }
@@ -492,21 +511,13 @@ impl AIG {
             } else {
                 Vec::new()
             };
-            inp0_cuts.push({
-                let mut hs = HashSet::new();
-                hs.insert(n.inp0.noinv());
-                hs
-            });
+            inp0_cuts.push(AIGCut::trivial(n.inp0.noinv()));
             let mut inp1_cuts = if !n.inp1.is_pi() {
                 self.get(n.inp1).cuts.clone()
             } else {
                 Vec::new()
             };
-            inp1_cuts.push({
-                let mut hs = HashSet::new();
-                hs.insert(n.inp1.noinv());
-                hs
-            });
+            inp1_cuts.push(AIGCut::trivial(n.inp1.noinv()));
 
             println!(
                 "node {} fanin cuts are {:?} and {:?}",
@@ -517,13 +528,16 @@ impl AIG {
             for inp0_cut in &inp0_cuts {
                 for inp1_cut in &inp1_cuts {
                     let combined_cut: HashSet<AIGRef> =
-                        inp0_cut.union(&inp1_cut).copied().collect();
+                        inp0_cut.refs.union(&inp1_cut.refs).copied().collect();
 
                     if combined_cut.len() > LUT_SZ {
                         continue;
                     }
 
-                    new_cuts.push(combined_cut);
+                    new_cuts.push(AIGCut {
+                        refs: combined_cut,
+                        arrival: u32::MAX,
+                    });
                 }
             }
 
@@ -539,7 +553,7 @@ impl AIG {
                     }
                     let cutj = &new_cuts[j];
 
-                    if cutj.is_subset(cuti) {
+                    if cutj.refs.is_subset(&cuti.refs) {
                         println!("! {:?} is dominated by {:?}", cuti, cutj);
                         remove = true;
                     }
@@ -552,26 +566,53 @@ impl AIG {
                 }
             }
 
+            // compute cut arrival times
+            let mut best_arrival = u32::MAX;
+            for cut in &mut new_cuts {
+                let mut arrival = 0;
+                for cutref in &cut.refs {
+                    let this_arrival = if cutref.is_pi() {
+                        0
+                    } else {
+                        self.get(*cutref).arrival
+                    };
+
+                    if this_arrival > arrival {
+                        arrival = this_arrival
+                    }
+                }
+
+                cut.arrival = 1 + arrival;
+
+                if cut.arrival < best_arrival {
+                    best_arrival = cut.arrival;
+                }
+            }
+
             println!("--> {:?}", new_cuts);
             self.nodes[nodei].cuts = new_cuts;
+            self.nodes[nodei].arrival = best_arrival;
         }
 
         self.dump_dot("cuts", |_, n| {
             format!(
-                "{{{}}}",
+                "{{{}}}\nbest arrival = {}",
                 n.cuts
                     .iter()
                     .map(|cut| {
                         format!(
-                            "{{{}}}",
-                            cut.iter()
+                            "{{{} @ {}}}",
+                            cut.refs
+                                .iter()
                                 .map(|cutref| { format!("{}", cutref) })
                                 .collect::<Vec<String>>()
-                                .join(",")
+                                .join(","),
+                            cut.arrival
                         )
                     })
                     .collect::<Vec<String>>()
-                    .join(",")
+                    .join(","),
+                n.arrival
             )
         });
     }
