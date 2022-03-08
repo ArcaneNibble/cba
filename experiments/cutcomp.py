@@ -74,7 +74,7 @@ def compute_cuts():
         n = GRAPH[ni]
         # print(n)
 
-        cuts = [[ni]]
+        cuts = [{ni}]
 
         if not n.is_pi():
             cuts_u = GRAPH[n.inp0].cuts
@@ -83,7 +83,7 @@ def compute_cuts():
 
             for u in cuts_u:
                 for v in cuts_v:
-                    cuts_unified = u + v
+                    cuts_unified = u | v
                     cuts.append(cuts_unified)
 
         n.cuts = cuts
@@ -92,14 +92,14 @@ def print_cuts(n):
     ret = f"{n.name}\ncuts = ["
 
     for cut in n.cuts:
-        ret += "["
+        ret += "{"
 
         for cuti in cut:
             ret += GRAPH[cuti].name + ","
 
         if ret.endswith(","):
             ret = ret[:-1]
-        ret += "],"
+        ret += "},"
 
     if ret.endswith(","):
         ret = ret[:-1]
