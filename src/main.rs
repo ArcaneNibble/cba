@@ -44,10 +44,7 @@ impl AIGRef {
         }
     }
     pub const fn inv(self) -> Self {
-        Self(self.0 | Self::FLG_INVERT)
-    }
-    pub const fn no_inv(self) -> Self {
-        Self(self.0 & !Self::FLG_INVERT)
+        Self(self.0 ^ Self::FLG_INVERT)
     }
 
     pub const fn idx(&self) -> usize {
@@ -307,12 +304,12 @@ impl AIG {
         f.write(format!("digraph {} {{\n", name).as_bytes())
             .unwrap();
 
-        for pi in &self.pi {
-            f.write(format!("{} [shape=triangle label=\"{}\nPI\"];\n", pi, pi).as_bytes())
+        for (i, pi) in self.pi.iter().enumerate() {
+            f.write(format!("pi{} [shape=triangle label=\"{}\nPI\"];\n", i, pi).as_bytes())
                 .unwrap();
         }
 
-        for (po_name, _po_ref) in &self.po {
+        for (po_name, po_ref) in &self.po {
             f.write(
                 format!(
                     "{} [shape=invtriangle label=\"{}\nPO\"];\n",
@@ -321,6 +318,45 @@ impl AIG {
                 .as_bytes(),
             )
             .unwrap();
+
+            let inv = if po_ref.is_invert() {
+                "[color=blue];"
+            } else {
+                ""
+            };
+            f.write(format!("{} -> {} {}\n", po_name, po_ref.idx(), inv).as_bytes())
+                .unwrap();
+        }
+
+        for (i, node) in self.nodes.iter().enumerate() {
+            f.write(format!("{} [label=\"{}\"];\n", i, node.name).as_bytes())
+                .unwrap();
+
+            let inv0 = if node.inp0.is_invert() {
+                "[color=blue];"
+            } else {
+                ""
+            };
+            if node.inp0.is_pi() {
+                f.write(format!("{} -> pi{} {}\n", i, node.inp0.pi_idx(), inv0).as_bytes())
+                    .unwrap();
+            } else {
+                f.write(format!("{} -> {} {}\n", i, node.inp0.idx(), inv0).as_bytes())
+                    .unwrap();
+            }
+
+            let inv1 = if node.inp1.is_invert() {
+                "[color=blue];"
+            } else {
+                ""
+            };
+            if node.inp1.is_pi() {
+                f.write(format!("{} -> pi{} {}\n", i, node.inp1.pi_idx(), inv1).as_bytes())
+                    .unwrap();
+            } else {
+                f.write(format!("{} -> {} {}\n", i, node.inp1.idx(), inv1).as_bytes())
+                    .unwrap();
+            }
         }
 
         f.write("}\n".as_bytes()).unwrap();
