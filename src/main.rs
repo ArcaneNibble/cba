@@ -254,6 +254,18 @@ impl AIG {
 
                     add_cell(nodes, AIGNode::new(a, b, cellname))
                 }
+                "$_OR_" => {
+                    let a = process_input(nodes, nets, pimap, get_cell_conn(cell, "A"));
+                    let b = process_input(nodes, nets, pimap, get_cell_conn(cell, "B"));
+
+                    add_cell(nodes, AIGNode::new(a.inv(), b.inv(), cellname)).inv()
+                }
+                "$_NOR_" => {
+                    let a = process_input(nodes, nets, pimap, get_cell_conn(cell, "A"));
+                    let b = process_input(nodes, nets, pimap, get_cell_conn(cell, "B"));
+
+                    add_cell(nodes, AIGNode::new(a.inv(), b.inv(), cellname))
+                }
                 "$_XOR_" => {
                     let a = process_input(nodes, nets, pimap, get_cell_conn(cell, "A"));
                     let b = process_input(nodes, nets, pimap, get_cell_conn(cell, "B"));
@@ -296,6 +308,45 @@ impl AIG {
             po,
 
             topo_order: Vec::new(),
+        }
+    }
+
+    pub fn get(&self, nref: AIGRef) -> &AIGNode {
+        debug_assert!(!nref.is_pi());
+        &self.nodes[nref.idx()]
+    }
+    pub fn get_mut(&mut self, nref: AIGRef) -> &mut AIGNode {
+        debug_assert!(!nref.is_pi());
+        &mut self.nodes[nref.idx()]
+    }
+
+    fn _topo_visit(&mut self, nref: AIGRef) {
+        if nref.is_pi() {
+            return;
+        }
+        if self.get(nref).num_fanouts > 0 {
+            return;
+        }
+
+        self._topo_visit(self.get(nref).inp0);
+        self._topo_visit(self.get(nref).inp1);
+        self.topo_order.push(nref.idx());
+        self.get_mut(nref).num_fanouts = 1;
+    }
+    pub fn calc_topo_order(&mut self) {
+        self.topo_order.clear();
+        self.topo_order.reserve(self.nodes.len());
+
+        for n in &mut self.nodes {
+            n.num_fanouts = 0;
+        }
+
+        for i in 0..self.po.len() {
+            self._topo_visit(self.po[i].1);
+        }
+
+        for n in &mut self.nodes {
+            n.num_fanouts = 0;
         }
     }
 
@@ -384,7 +435,10 @@ fn main() {
     let netlist = Netlist::from_reader(f).expect("failed to parse netlist JSON");
 
     // Make AIG
-    let aig = AIG::parse_netlist(netlist);
+    let mut aig = AIG::parse_netlist(netlist);
     println!("final AIG is {:#?}", aig);
     aig.dump_dot("nodes", |_, _| "".to_string());
+
+    aig.calc_topo_order();
+    println!("topo order is {:?}", aig.topo_order);
 }
