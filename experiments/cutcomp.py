@@ -14,18 +14,32 @@ class Node:
         return self.inp0 is None and self.inp1 is None
 
 GRAPH = [
-    Node('a', None, None),
+    Node('a', None, None),      # 0
     Node('b', None, None),
     Node('c', None, None),
+    Node('d', None, None),
+    Node('e', None, None),
+    Node('f', None, None),
 
-    Node('d', 0, 1),
-    Node('e', 1, 2),
+    Node('g', 0, 1),            # 6
+    Node('h', 2, 3),
+    Node('i', 4, 5),
 
-    Node('f', 3, 4),
+    Node('j', 6, 2),            # 9
+    Node('k', 6, 7),
+    Node('l', 7, 8),
+    Node('m', 2, 8),
 
-    Node('x', 0, 5),
+    Node('n', 9, 10),           # 13
+    Node('o', 10, 11),
+    Node('p', 11, 12),
+
+    Node('q', 13, 14),          # 16
+    Node('r', 10, 15),
+
+    Node('s', 16, 17),          # 18
 ]
-POs = [6]
+POs = [18]
 # print(GRAPH)
 
 LUTN = 4
@@ -66,7 +80,7 @@ def get_topo_order():
 
     return order
 
-# printgraph('test', lambda x: x.name + "\nhihi")
+printgraph('nodes', lambda x: x.name)
 
 TOPO_ORDER = get_topo_order()
 # print(TOPO_ORDER)
