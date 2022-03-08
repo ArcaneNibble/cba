@@ -248,6 +248,8 @@ impl AIG {
             }
 
             match &cell.cell_type as &str {
+                "$_BUF_" => process_input(nodes, nets, pimap, get_cell_conn(cell, "A")),
+                "$_NOT_" => process_input(nodes, nets, pimap, get_cell_conn(cell, "A")).inv(),
                 "$_AND_" => {
                     let a = process_input(nodes, nets, pimap, get_cell_conn(cell, "A"));
                     let b = process_input(nodes, nets, pimap, get_cell_conn(cell, "B"));
@@ -259,6 +261,12 @@ impl AIG {
                     let b = process_input(nodes, nets, pimap, get_cell_conn(cell, "B"));
 
                     add_cell(nodes, AIGNode::new(a.inv(), b.inv(), cellname)).inv()
+                }
+                "$_NAND_" => {
+                    let a = process_input(nodes, nets, pimap, get_cell_conn(cell, "A"));
+                    let b = process_input(nodes, nets, pimap, get_cell_conn(cell, "B"));
+
+                    add_cell(nodes, AIGNode::new(a, b, cellname)).inv()
                 }
                 "$_NOR_" => {
                     let a = process_input(nodes, nets, pimap, get_cell_conn(cell, "A"));
@@ -277,6 +285,30 @@ impl AIG {
                         AIGNode::new(n1.inv(), n2.inv(), &format!("{}_n3", cellname)),
                     );
                     n3.inv()
+                }
+                "$_XNOR_" => {
+                    let a = process_input(nodes, nets, pimap, get_cell_conn(cell, "A"));
+                    let b = process_input(nodes, nets, pimap, get_cell_conn(cell, "B"));
+
+                    let n1 = add_cell(nodes, AIGNode::new(a, b.inv(), &format!("{}_n1", cellname)));
+                    let n2 = add_cell(nodes, AIGNode::new(a.inv(), b, &format!("{}_n2", cellname)));
+                    let n3 = add_cell(
+                        nodes,
+                        AIGNode::new(n1.inv(), n2.inv(), &format!("{}_n3", cellname)),
+                    );
+                    n3
+                }
+                "$_ANDNOT_" => {
+                    let a = process_input(nodes, nets, pimap, get_cell_conn(cell, "A"));
+                    let b = process_input(nodes, nets, pimap, get_cell_conn(cell, "B"));
+
+                    add_cell(nodes, AIGNode::new(a, b.inv(), cellname))
+                }
+                "$_ORNOT_" => {
+                    let a = process_input(nodes, nets, pimap, get_cell_conn(cell, "A"));
+                    let b = process_input(nodes, nets, pimap, get_cell_conn(cell, "B"));
+
+                    add_cell(nodes, AIGNode::new(a.inv(), b, cellname)).inv()
                 }
                 _ => panic!("unknown cell type {}", cell.cell_type),
             }
