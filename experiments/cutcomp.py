@@ -5,6 +5,14 @@ class Node:
         self.inp1 = inp1
         self.visited = False
 
+    def __repr__(self):
+        if self.is_pi():
+            return f"Node {self.name}: PI"
+        return f"Node {self.name}: {GRAPH[self.inp0].name} & {GRAPH[self.inp1].name}"
+
+    def is_pi(self):
+        return self.inp0 is None and self.inp1 is None
+
 GRAPH = [
     Node('a', None, None),
     Node('b', None, None),
@@ -56,7 +64,47 @@ def get_topo_order():
 
     return order
 
-printgraph('test', lambda x: x.name + "\nhihi")
+# printgraph('test', lambda x: x.name + "\nhihi")
 
-topo_order = get_topo_order()
-print(topo_order)
+TOPO_ORDER = get_topo_order()
+# print(TOPO_ORDER)
+
+def compute_cuts():
+    for ni in TOPO_ORDER:
+        n = GRAPH[ni]
+        # print(n)
+
+        cuts = [[ni]]
+
+        if not n.is_pi():
+            cuts_u = GRAPH[n.inp0].cuts
+            cuts_v = GRAPH[n.inp1].cuts
+            # print(n, cuts_u, cuts_v)
+
+            for u in cuts_u:
+                for v in cuts_v:
+                    cuts_unified = u + v
+                    cuts.append(cuts_unified)
+
+        n.cuts = cuts
+
+def print_cuts(n):
+    ret = f"{n.name}\ncuts = ["
+
+    for cut in n.cuts:
+        ret += "["
+
+        for cuti in cut:
+            ret += GRAPH[cuti].name + ","
+
+        if ret.endswith(","):
+            ret = ret[:-1]
+        ret += "],"
+
+    if ret.endswith(","):
+        ret = ret[:-1]
+    ret += "]"
+    return ret
+
+compute_cuts()
+printgraph('cuts', print_cuts)
