@@ -93,7 +93,7 @@ def compute_cuts():
         # cuts = cuts[::-1]
 
         i = 0
-        print("~~~~~ all cuts", cuts)
+        # print("~~~~~ all cuts", cuts)
         while i < len(cuts):
             cuti = cuts[i]
             remove = False
@@ -103,13 +103,13 @@ def compute_cuts():
                 if i == j:
                     continue
                 cutj = cuts[j]
-                print(cuti, cutj)
+                # print(cuti, cutj)
 
                 if cutj <= cuti:
                     print(f"! {cuti} is dominated by {cutj}")
                     remove = True
 
-            print(remove)
+            # print(remove)
             if remove:
                 del cuts[i]
             else:
@@ -137,3 +137,56 @@ def print_cuts(n):
 
 compute_cuts()
 printgraph('cuts', print_cuts)
+
+def compute_arrivals():
+    for ni in TOPO_ORDER:
+        n = GRAPH[ni]
+
+        if n.is_pi():
+            n.node_arrival = 0
+            assert n.cuts == [{ni}]
+            n.cut_arrivals = [9999]
+            n.best_cut = None
+        else:
+            cut_arrivals = [9999]
+            print(n.cuts)
+            assert n.cuts[0] == {ni}
+            assert len(n.cuts) > 1
+            # skip trivial cut
+            for cut in n.cuts[1:]:
+                max_arrival = -1
+                for inp_ni in cut:
+                    max_arrival = max(max_arrival, GRAPH[inp_ni].node_arrival)
+                assert max_arrival >= 0
+                cut_arrivals.append(1 + max_arrival)
+            n.cut_arrivals = cut_arrivals
+
+            best_cut = None
+            node_arrival = 9999
+
+            for i in range(1, len(n.cuts)):
+                cut = n.cuts[i]
+                cut_arrival = cut_arrivals[i]
+                if cut_arrival < node_arrival:
+                    node_arrival = cut_arrival
+                    best_cut = cut
+
+            assert best_cut is not None
+            n.node_arrival = node_arrival
+            n.best_cut = set(best_cut)
+
+def print_cuts_arrivals(n):
+    ret = print_cuts(n)
+    ret += "\ncut arrivals = " + str(n.cut_arrivals)
+    ret += "\nnode arrival = " + str(n.node_arrival)
+    if n.best_cut is not None:
+        ret += "\nbest cut = {"
+        for ni in n.best_cut:
+            ret += GRAPH[ni].name + ","
+        if ret.endswith(","):
+            ret = ret[:-1]
+        ret += "}"
+    return ret
+
+compute_arrivals()
+printgraph('cuts_arrivals', print_cuts_arrivals)
