@@ -299,7 +299,7 @@ impl AIG {
         }
     }
 
-    pub fn dump_dot(&self, name: &str) {
+    pub fn dump_dot(&self, name: &str, extra_labels: impl Fn(&Self, &AIGNode) -> String) {
         let mut f = File::create(format!("{}.dot", name)).expect("failed to open file");
         f.write(format!("digraph {} {{\n", name).as_bytes())
             .unwrap();
@@ -329,8 +329,16 @@ impl AIG {
         }
 
         for (i, node) in self.nodes.iter().enumerate() {
-            f.write(format!("{} [label=\"{}\"];\n", i, node.name).as_bytes())
-                .unwrap();
+            f.write(
+                format!(
+                    "{} [label=\"{}\n{}\"];\n",
+                    i,
+                    node.name,
+                    extra_labels(self, node)
+                )
+                .as_bytes(),
+            )
+            .unwrap();
 
             let inv0 = if node.inp0.is_invert() {
                 "[color=blue];"
@@ -378,5 +386,5 @@ fn main() {
     // Make AIG
     let aig = AIG::parse_netlist(netlist);
     println!("final AIG is {:#?}", aig);
-    aig.dump_dot("nodes");
+    aig.dump_dot("nodes", |_, _| "".to_string());
 }
