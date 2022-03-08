@@ -161,38 +161,55 @@ def compute_arrivals():
             assert n.cuts == [{ni}]
             n.cut_arrivals = [9999]
             n.best_cut = None
+            n.af = 0
+            n.cut_afs = [9999]
         else:
             cut_arrivals = [9999]
+            cut_afs = [9999]
             print(n.cuts)
             assert n.cuts[0] == {ni}
             assert len(n.cuts) > 1
             # skip trivial cut
             for cut in n.cuts[1:]:
                 max_arrival = -1
+                af = 0
                 for inp_ni in cut:
                     max_arrival = max(max_arrival, GRAPH[inp_ni].node_arrival)
+                    af += GRAPH[inp_ni].af
                 assert max_arrival >= 0
                 cut_arrivals.append(1 + max_arrival)
+                cut_afs.append(1 + af)
             n.cut_arrivals = cut_arrivals
+            n.cut_afs = cut_afs
 
             best_cut = None
-            node_arrival = 9999
+            best_arrival = 9999
+            best_af = 9999
 
             for i in range(1, len(n.cuts)):
                 cut = n.cuts[i]
                 cut_arrival = cut_arrivals[i]
-                if cut_arrival < node_arrival:
-                    node_arrival = cut_arrival
+                cut_af = cut_afs[i]
+                if cut_arrival < best_arrival:
+                    best_arrival = cut_arrival
                     best_cut = cut
+                    best_af = cut_af
+                elif cut_arrival == best_arrival:
+                    if cut_af < best_af:
+                        best_cut = cut
+                        best_af = cut_af
 
             assert best_cut is not None
-            n.node_arrival = node_arrival
+            n.node_arrival = best_arrival
             n.best_cut = set(best_cut)
+            n.af = best_af
 
 def print_cuts_arrivals(n):
     ret = print_cuts(n)
-    ret += "\ncut arrivals = " + str(n.cut_arrivals)
-    ret += "\nnode arrival = " + str(n.node_arrival)
+    ret += "\nbest area (flow) = " + str(n.af)
+    ret += "\nbest arrival = " + str(n.node_arrival)
+    ret += "\nall area (flow) = " + str(n.cut_afs)
+    ret += "\nall arrivals = " + str(n.cut_arrivals)
     if n.best_cut is not None:
         ret += "\nbest cut = {"
         for ni in n.best_cut:
