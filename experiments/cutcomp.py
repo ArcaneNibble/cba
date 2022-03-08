@@ -1,6 +1,9 @@
-from collections import namedtuple
-
-Node = namedtuple('Node', ['name', 'inp0', 'inp1'])
+class Node:
+    def __init__(self, name, inp0, inp1):
+        self.name = name
+        self.inp0 = inp0
+        self.inp1 = inp1
+        self.visited = False
 
 GRAPH = [
     Node('a', None, None),
@@ -14,6 +17,7 @@ GRAPH = [
 
     Node('x', 0, 5),
 ]
+POs = [6]
 # print(GRAPH)
 
 def printgraph(graphname, lblfn):
@@ -28,4 +32,31 @@ def printgraph(graphname, lblfn):
                 print(f"{n.name} -> {GRAPH[n.inp1].name}", file=f)
         print("}", file=f)
 
+def get_topo_order():
+    order = []
+
+    def topo_recurse(ni):
+        n = GRAPH[ni]
+        if n.visited:
+            return
+
+        if n.inp0 is not None:
+            topo_recurse(n.inp0)
+        if n.inp1 is not None:
+            topo_recurse(n.inp1)
+
+        order.append(ni)
+        n.visited = True
+
+    for po in POs:
+        topo_recurse(po)
+
+    for i in range(len(GRAPH)):
+        GRAPH[i].visited = False
+
+    return order
+
 printgraph('test', lambda x: x.name + "\nhihi")
+
+topo_order = get_topo_order()
+print(topo_order)
