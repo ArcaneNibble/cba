@@ -1,6 +1,7 @@
 //! Some AIG algorithms
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::fmt::{self, Display, Formatter};
 use std::fs::File;
 use std::io::Write;
 use yosys_netlist_json::*;
@@ -43,8 +44,15 @@ impl AIGRef {
             self.0 &= !Self::FLG_INVERT;
         }
     }
+    pub const fn noinv(self) -> Self {
+        Self(self.0 & !Self::FLG_INVERT)
+    }
     pub const fn inv(self) -> Self {
         Self(self.0 ^ Self::FLG_INVERT)
+    }
+
+    pub const fn _any_idx(&self) -> usize {
+        (self.0 & Self::MASK_IDX) as usize
     }
 
     pub const fn idx(&self) -> usize {
@@ -58,8 +66,24 @@ impl AIGRef {
     }
 }
 
+impl Display for AIGRef {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        if self.is_invert() {
+            write!(f, "!")?;
+        }
+
+        if self.is_pi() {
+            write!(f, "PI")?;
+        }
+
+        write!(f, "{}", self._any_idx())
+    }
+}
+
+const LUT_SZ: usize = 4;
+
 /// AND node in an AIG
-#[derive(Clone, PartialEq, Eq, Debug, Hash)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct AIGNode {
     pub name: String,
     pub inp0: AIGRef,
@@ -68,6 +92,8 @@ pub struct AIGNode {
     /// number of fanouts in the resulting LUT map
     /// will be abused for initial topological order computation as a mark flag
     pub num_fanouts: u32,
+
+    pub cuts: Vec<HashSet<AIGRef>>,
 }
 
 impl AIGNode {
@@ -78,6 +104,7 @@ impl AIGNode {
             inp1,
 
             num_fanouts: 0,
+            cuts: Vec::new(),
         }
     }
 }
@@ -388,7 +415,7 @@ impl AIG {
             .unwrap();
 
         for (i, pi) in self.pi.iter().enumerate() {
-            f.write(format!("pi{} [shape=triangle label=\"{}\nPI\"];\n", i, pi).as_bytes())
+            f.write(format!("pi{} [shape=triangle label=\"{}\nPI{}\"];\n", i, pi, i).as_bytes())
                 .unwrap();
         }
 
@@ -414,9 +441,10 @@ impl AIG {
         for (i, node) in self.nodes.iter().enumerate() {
             f.write(
                 format!(
-                    "{} [label=\"{}\n{}\"];\n",
+                    "{} [label=\"{}\nidx={}\n{}\"];\n",
                     i,
                     node.name,
+                    i,
                     extra_labels(self, node)
                 )
                 .as_bytes(),
@@ -452,6 +480,101 @@ impl AIG {
 
         f.write("}\n".as_bytes()).unwrap();
     }
+
+    fn loopdeloop(&mut self) {
+        assert!(self.topo_order.len() > 0);
+
+        for &nodei in &self.topo_order {
+            let n = &self.nodes[nodei];
+
+            let mut inp0_cuts = if !n.inp0.is_pi() {
+                self.get(n.inp0).cuts.clone()
+            } else {
+                Vec::new()
+            };
+            inp0_cuts.push({
+                let mut hs = HashSet::new();
+                hs.insert(n.inp0.noinv());
+                hs
+            });
+            let mut inp1_cuts = if !n.inp1.is_pi() {
+                self.get(n.inp1).cuts.clone()
+            } else {
+                Vec::new()
+            };
+            inp1_cuts.push({
+                let mut hs = HashSet::new();
+                hs.insert(n.inp1.noinv());
+                hs
+            });
+
+            println!(
+                "node {} fanin cuts are {:?} and {:?}",
+                n.name, inp0_cuts, inp1_cuts
+            );
+
+            let mut new_cuts = Vec::with_capacity(inp0_cuts.len() * inp1_cuts.len());
+            for inp0_cut in &inp0_cuts {
+                for inp1_cut in &inp1_cuts {
+                    let combined_cut: HashSet<AIGRef> =
+                        inp0_cut.union(&inp1_cut).copied().collect();
+
+                    if combined_cut.len() > LUT_SZ {
+                        continue;
+                    }
+
+                    new_cuts.push(combined_cut);
+                }
+            }
+
+            // filter dominated cuts
+            let mut i = 0;
+            while i < new_cuts.len() {
+                let cuti = &new_cuts[i];
+                let mut remove = false;
+
+                for j in 0..new_cuts.len() {
+                    if i == j {
+                        continue;
+                    }
+                    let cutj = &new_cuts[j];
+
+                    if cutj.is_subset(cuti) {
+                        println!("! {:?} is dominated by {:?}", cuti, cutj);
+                        remove = true;
+                    }
+                }
+
+                if remove {
+                    new_cuts.remove(i);
+                } else {
+                    i += 1;
+                }
+            }
+
+            println!("--> {:?}", new_cuts);
+            self.nodes[nodei].cuts = new_cuts;
+        }
+
+        self.dump_dot("cuts", |_, n| {
+            format!(
+                "{{{}}}",
+                n.cuts
+                    .iter()
+                    .map(|cut| {
+                        format!(
+                            "{{{}}}",
+                            cut.iter()
+                                .map(|cutref| { format!("{}", cutref) })
+                                .collect::<Vec<String>>()
+                                .join(",")
+                        )
+                    })
+                    .collect::<Vec<String>>()
+                    .join(",")
+            )
+        });
+    }
 }
 
 fn main() {
@@ -473,4 +596,6 @@ fn main() {
 
     aig.calc_topo_order();
     println!("topo order is {:?}", aig.topo_order);
+
+    aig.loopdeloop();
 }
