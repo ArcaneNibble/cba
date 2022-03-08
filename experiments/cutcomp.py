@@ -86,6 +86,29 @@ def compute_cuts():
                     cuts_unified = u | v
                     cuts.append(cuts_unified)
 
+        i = 0
+        print("~~~~~ all cuts", cuts)
+        while i < len(cuts):
+            cuti = cuts[i]
+            remove = False
+            # print(cuti)
+
+            for j in range(len(cuts)):
+                if i == j:
+                    continue
+                cutj = cuts[j]
+                print(cuti, cutj)
+
+                if cutj <= cuti:
+                    print(f"! {cuti} is dominated by {cutj}")
+                    remove = True
+
+            print(remove)
+            if remove:
+                del cuts[i]
+            else:
+                i += 1
+
         n.cuts = cuts
 
 def print_cuts(n):
