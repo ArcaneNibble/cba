@@ -83,8 +83,9 @@ def compute_cuts():
 
             for u in cuts_u:
                 for v in cuts_v:
-                    cuts_unified = u | v
-                    cuts.append(cuts_unified)
+                    cuts.append(u | v)
+
+        # cuts = cuts[::-1]
 
         i = 0
         print("~~~~~ all cuts", cuts)
