@@ -331,4 +331,55 @@ compute_required_times()
 printgraph('cuts_times', print_required_times)
 
 def recover_area_global():
-    ...
+    for ni in TOPO_ORDER:
+        n = GRAPH[ni]
+
+        if n.is_pi():
+            # XXX
+            assert n.node_arrival == 0
+            assert n.cut_arrivals == [9999]
+            assert n.best_cut == None
+            assert n.af == 0
+            assert n.cut_afs == [9999]
+
+            n.node_arrival = 0
+            assert n.cuts == [{ni}]
+            n.cut_arrivals = [9999]
+            n.best_cut = None
+            n.af = 0
+            n.cut_afs = [9999]
+        else:
+            print(f"\nrecover area on {n.name} with best_cut {n.best_cut} arrival {n.node_arrival} required time {n.required_time}")
+
+            best_cut = None
+            best_arrival = 9999
+            best_af = 9999
+
+            for i in range(1, len(n.cuts)):
+                cut = n.cuts[i]
+                cut_arrival = n.cut_arrivals[i]
+                cut_af = n.cut_afs[i]
+
+                print(f"cut {cut} with arrival {cut_arrival} and af {cut_af}")
+                if cut_arrival > n.required_time:
+                    print("too slow")
+                    continue
+
+                if cut_af < best_af:
+                    best_af = cut_af
+                    best_cut = cut
+                    best_arrival = cut_arrival
+                elif cut_af == best_af:
+                    if cut_arrival < best_arrival:
+                        best_cut = cut
+                        best_arrival = cut_arrival
+
+            assert best_cut is not None
+            n.node_arrival = best_arrival
+            n.best_cut = set(best_cut)
+            n.af = best_af
+
+            print(f"recovered to {n.best_cut} arrival {n.node_arrival} af {n.af}")
+
+recover_area_global()
+printgraph('cuts_recover_global', print_cuts_arrivals)
