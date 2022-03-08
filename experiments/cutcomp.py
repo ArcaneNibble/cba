@@ -166,7 +166,7 @@ def compute_arrivals():
         else:
             cut_arrivals = [9999]
             cut_afs = [9999]
-            print(n.cuts)
+            # print(n.cuts)
             assert n.cuts[0] == {ni}
             assert len(n.cuts) > 1
             # skip trivial cut
@@ -221,3 +221,75 @@ def print_cuts_arrivals(n):
 
 compute_arrivals()
 printgraph('cuts_arrivals', print_cuts_arrivals)
+
+def compute_area_flow():
+    for ni in TOPO_ORDER:
+        n = GRAPH[ni]
+        n.num_fanouts = 0
+
+
+    lutlutlut = []
+
+    def map_lut_at(ni):
+        n = GRAPH[ni]
+        print(n.best_cut)
+        assert len(n.best_cut) <= LUTN
+        inps = []
+        for inp in n.best_cut:
+            inpn = GRAPH[inp]
+            print(inpn.name)
+            inpn.num_fanouts += 1
+            if inpn.is_pi():
+                inps.append(inp)
+            else:
+                print("recurse!")
+                lutidx = map_lut_at(inp)
+                print(f"got lut {lutidx}")
+                inps.append(-lutidx - 1)
+        print(inps)
+        lutidx = len(lutlutlut)
+        lutlutlut.append(inps)
+        return lutidx
+
+    for po in POs:
+        map_lut_at(po)
+
+
+    for ni in TOPO_ORDER:
+        n = GRAPH[ni]
+
+        if n.is_pi():
+            n.af = 0.0
+        else:
+            print(f"node {n.name} #fanouts {n.num_fanouts} bestcut {n.best_cut}")
+
+            af = 0.0
+            for inp in n.best_cut:
+                print(f" input {GRAPH[inp].name} contributed {GRAPH[inp].af}")
+                af += GRAPH[inp].af
+            af += 1
+
+            if n.num_fanouts != 0:
+                af /= n.num_fanouts
+
+            n.af = af
+
+
+    return lutlutlut
+
+def print_area_flow(n):
+    ret = n.name
+    ret += "\n# fanouts = " + str(n.num_fanouts)
+    ret += "\narea flow = " + str(n.af)
+    if n.best_cut is not None:
+        ret += "\nbest cut = {"
+        for ni in n.best_cut:
+            ret += GRAPH[ni].name + ","
+        if ret.endswith(","):
+            ret = ret[:-1]
+        ret += "}"
+    return ret
+
+lut_mapping = compute_area_flow()
+printgraph('cuts_af', print_area_flow)
+print(lut_mapping)
