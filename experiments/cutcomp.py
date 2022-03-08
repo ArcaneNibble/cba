@@ -28,6 +28,8 @@ GRAPH = [
 POs = [6]
 # print(GRAPH)
 
+LUTN = 4
+
 def printgraph(graphname, lblfn):
     with open(f'{graphname}.dot', 'w') as f:
         print(f"digraph {graphname} {{", file=f)
@@ -83,7 +85,10 @@ def compute_cuts():
 
             for u in cuts_u:
                 for v in cuts_v:
-                    cuts.append(u | v)
+                    cuts_merged = u | v
+                    if len(cuts_merged) > LUTN:
+                        continue
+                    cuts.append(cuts_merged)
 
         # cuts = cuts[::-1]
 
