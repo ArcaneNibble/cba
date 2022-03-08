@@ -86,6 +86,7 @@ const LUT_SZ: usize = 4;
 pub struct AIGCut {
     pub refs: HashSet<AIGRef>,
     pub arrival: u32,
+    pub area_flow: f32,
 }
 
 impl AIGCut {
@@ -95,6 +96,7 @@ impl AIGCut {
         Self {
             refs: hs,
             arrival: u32::MAX,
+            area_flow: f32::INFINITY,
         }
     }
 }
@@ -112,6 +114,7 @@ pub struct AIGNode {
 
     pub cuts: Vec<AIGCut>,
     pub arrival: u32,
+    pub area_flow: f32,
 }
 
 impl AIGNode {
@@ -124,6 +127,7 @@ impl AIGNode {
             num_fanouts: 0,
             cuts: Vec::new(),
             arrival: u32::MAX,
+            area_flow: f32::INFINITY,
         }
     }
 }
@@ -537,6 +541,7 @@ impl AIG {
                     new_cuts.push(AIGCut {
                         refs: combined_cut,
                         arrival: u32::MAX,
+                        area_flow: f32::INFINITY,
                     });
                 }
             }
@@ -583,36 +588,64 @@ impl AIG {
                 }
 
                 cut.arrival = 1 + arrival;
-
                 if cut.arrival < best_arrival {
                     best_arrival = cut.arrival;
+                }
+            }
+
+            // compute area flow
+            // fixme: is this how it's supposed to work?
+            let mut best_area_flow = f32::INFINITY;
+            for cut in &mut new_cuts {
+                let mut af = 0.0;
+                for cutref in &cut.refs {
+                    let this_af = if cutref.is_pi() {
+                        0.0
+                    } else {
+                        self.get(*cutref).area_flow
+                    };
+
+                    af += this_af;
+                }
+
+                af += 1.0;
+                if n.num_fanouts > 0 {
+                    af /= n.num_fanouts as f32;
+                }
+
+                cut.area_flow = af;
+                if cut.area_flow < best_area_flow {
+                    best_area_flow = cut.area_flow;
                 }
             }
 
             println!("--> {:?}", new_cuts);
             self.nodes[nodei].cuts = new_cuts;
             self.nodes[nodei].arrival = best_arrival;
+            self.nodes[nodei].area_flow = best_area_flow;
         }
 
         self.dump_dot("cuts", |_, n| {
             format!(
-                "{{{}}}\nbest arrival = {}",
+                "{{{}}}\nbest arrival = {}\nbest area = {}",
                 n.cuts
                     .iter()
                     .map(|cut| {
                         format!(
-                            "{{{} @ {}}}",
+                            "{{{} @ {} AF {}}}",
                             cut.refs
                                 .iter()
                                 .map(|cutref| { format!("{}", cutref) })
                                 .collect::<Vec<String>>()
                                 .join(","),
-                            cut.arrival
+                            cut.arrival,
+                            cut.area_flow
                         )
                     })
                     .collect::<Vec<String>>()
                     .join(","),
-                n.arrival
+                n.arrival,
+                n.area_flow
             )
         });
     }
